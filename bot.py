@@ -2,23 +2,28 @@ import os, asyncio, base64, aiohttp, io
 import dns.resolver                                 # DNS-override
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
+from aiogram import Router
 from PIL import Image
+from aiohttp import web
 
-# ========== DNS-OVERRIDE (100 % работает в Render) ==========
+# ---------- DNS-OVERRIDE (100 % работает в Render) ----------
 dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 dns.resolver.default_resolver.nameservers = ['8.8.8.8', '8.8.4.4']
 
-# ========== ТОКЕНЫ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
+# ---------- ТОКЕНЫ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ----------
 CLIENT_ID     = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 BOT_TOKEN     = os.getenv("BOT_TOKEN")
 AUTH_BASIC    = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
-# ========== СОЗДАЁМ БОТА БЕЗ base_url ==========
-bot = Bot(token=BOT_TOKEN)
+# ---------- ПРОКСИ RENDER ----------
+WORKER_URL    = "https://sneakercard-2.onrender.com"
+bot = Bot(token=BOT_TOKEN, base_url=f"{WORKER_URL}/bot")
+
 dp  = Dispatcher()
 
-# ========== ПОЛУЧАЕМ ACCESS-TOKEN (30 мин) ==========
+# ---------- ПОЛУЧАЕМ ACCESS-TOKEN (30 мин) ----------
 async def get_token(session):
     url  = "https://gigachat.devices.sberbank.ru/api/v2/oauth"
     headers = {"Authorization": f"Basic {AUTH_BASIC}",
@@ -26,7 +31,7 @@ async def get_token(session):
     async with session.post(url, headers=headers, data="scope=GIGACHAT_API_PERS") as resp:
         return (await resp.json()).get("access_token")
 
-# ========== KANDINSKY 3 ==========
+# ---------- KANDINSKY 3 ----------
 async def kandinsky(base64_img: str, token: str):
     url  = "https://gigachat.devices.sberbank.ru/api/v1/images/edit"
     headers = {"Authorization": f"Bearer {token}",
@@ -38,7 +43,7 @@ async def kandinsky(base64_img: str, token: str):
         async with s.post(url, headers=headers, json=payload) as r:
             return (await r.json()).get("image")
 
-# ========== ПРИЁМ ФОТО ==========
+# ---------- ПРИЁМ ФОТО ----------
 @dp.message(F.photo)
 async def get_photo(msg: types.Message):
     file = await bot.get_file(msg.photo[-1].file_id)
@@ -56,13 +61,13 @@ async def get_photo(msg: types.Message):
             await msg.answer_photo(
                 FSInputFile("/tmp/card.jpg"),
                 caption="✅ Готово! 1024×1024, без водяных знаков.",
-                reply_markup=ikb_buy()
+                reply_markup=ikb_webhook()
             )
         else:
             await msg.answer("😞 Попробуйте ещё раз.")
 
-# ========== КНОПКИ + STARS ==========
-def ikb_buy():
+# ---------- КНОПКИ + STARS ----------
+def ikb_webhook():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="10 шт – 199 ⭐", pay=True)]
     ])
@@ -75,6 +80,21 @@ async def pre_check(p: types.PreCheckoutQuery):
 async def paid(msg: types.Message):
     await msg.answer("Спасибо! ZIP с 10 шаблонами – заглушка)")
 
-# ========== ЗАПУСК ==========
+# ---------- HTTP-ENDPOINT (чтобы Render не ругался) ----------
+async def on_startup(app: web.Application):
+    await bot.set_webhook("https://sneakercard-2.onrender.com/webhook")
+
+async def on_shutdown(app: web.Application):
+    await bot.delete_webhook()
+
+def create_app() -> web.Application:
+    app = web.Application()
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
+    return app
+
+# ---------- ЗАПУСК ----------
 if __name__ == "__main__":
-    asyncio.run(dp.start_polling(bot))
+    app = create_app()
+    web.run_app(app, host="0.0.0.0", port=8080)
