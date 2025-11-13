@@ -1,5 +1,5 @@
 import os, asyncio, base64, aiohttp, io
-import dns.resolver                                 # ← DNS-override
+import dns.resolver                                 # DNS-override
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from PIL import Image
@@ -14,8 +14,8 @@ CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 BOT_TOKEN     = os.getenv("BOT_TOKEN")
 AUTH_BASIC    = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
-# ========== ПРОКСИ WORKER ==========
-WORKER_URL    = "https://wandering-darkness-fabb.worker45435345.workers.dev"
+# ========== ПРОКСИ RENDER ==========
+WORKER_URL    = "https://sneakercard-2.onrender.com"
 bot = Bot(token=BOT_TOKEN, base_url=f"{WORKER_URL}/bot")
 
 dp  = Dispatcher()
