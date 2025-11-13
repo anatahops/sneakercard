@@ -3,7 +3,6 @@ import dns.resolver                                 # DNS-override
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
-from aiogram import Router
 from PIL import Image
 from aiohttp import web
 
@@ -19,7 +18,12 @@ AUTH_BASIC    = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode
 
 # ---------- ПРОКСИ RENDER ----------
 WORKER_URL    = "https://sneakercard-2.onrender.com"
-bot = Bot(token=BOT_TOKEN, base_url=f"{WORKER_URL}/bot")
+
+# ❌ Старое (Aiogram 2.x)
+# bot = Bot(token=BOT_TOKEN, base_url=f"{WORKER_URL}/bot")
+
+# ✅ Новое (Aiogram 3.x)
+bot = Bot(token=BOT_TOKEN)
 
 dp  = Dispatcher()
 
