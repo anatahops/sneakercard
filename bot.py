@@ -1,21 +1,26 @@
 import os, asyncio, base64, aiohttp, io
+import dns.resolver                                 # ← DNS-override
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from PIL import Image
 
-# ---------- 1. Токены из переменных HF ----------
+# ========== DNS-OVERRIDE (100 % работает в Render) ==========
+dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+dns.resolver.default_resolver.nameservers = ['8.8.8.8', '8.8.4.4']
+
+# ========== ТОКЕНЫ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
 CLIENT_ID     = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 BOT_TOKEN     = os.getenv("BOT_TOKEN")
 AUTH_BASIC    = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
-# ---------- 2. Прокси Cloudflare Worker ----------
+# ========== ПРОКСИ WORKER ==========
 WORKER_URL    = "https://wandering-darkness-fabb.worker45435345.workers.dev"
 bot = Bot(token=BOT_TOKEN, base_url=f"{WORKER_URL}/bot")
 
 dp  = Dispatcher()
 
-# ---------- 3. Получаем access_token (30 мин) ----------
+# ========== ПОЛУЧАЕМ ACCESS-TOKEN (30 мин) ==========
 async def get_token(session):
     url  = "https://gigachat.devices.sberbank.ru/api/v2/oauth"
     headers = {"Authorization": f"Basic {AUTH_BASIC}",
@@ -23,7 +28,7 @@ async def get_token(session):
     async with session.post(url, headers=headers, data="scope=GIGACHAT_API_PERS") as resp:
         return (await resp.json()).get("access_token")
 
-# ---------- 4. Kandinsky 3 ----------
+# ========== KANDINSKY 3 ==========
 async def kandinsky(base64_img: str, token: str):
     url  = "https://gigachat.devices.sberbank.ru/api/v1/images/edit"
     headers = {"Authorization": f"Bearer {token}",
@@ -35,7 +40,7 @@ async def kandinsky(base64_img: str, token: str):
         async with s.post(url, headers=headers, json=payload) as r:
             return (await r.json()).get("image")
 
-# ---------- 5. Приём фото ----------
+# ========== ПРИЁМ ФОТО ==========
 @dp.message(F.photo)
 async def get_photo(msg: types.Message):
     file = await bot.get_file(msg.photo[-1].file_id)
@@ -58,7 +63,7 @@ async def get_photo(msg: types.Message):
         else:
             await msg.answer("😞 Попробуйте ещё раз.")
 
-# ---------- 6. Кнопки + Stars ----------
+# ========== КНОПКИ + STARS ==========
 def ikb_buy():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="10 шт – 199 ⭐", pay=True)]
@@ -72,6 +77,6 @@ async def pre_check(p: types.PreCheckoutQuery):
 async def paid(msg: types.Message):
     await msg.answer("Спасибо! ZIP с 10 шаблонами – заглушка)")
 
-# ---------- 7. Запуск ----------
+# ========== ЗАПУСК ==========
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))
