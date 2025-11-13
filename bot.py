@@ -3,26 +3,29 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from PIL import Image
 
-# Получаем переменные окружения из Hugging Face Spaces
-CLIENT_ID = os.getenv("CLIENT_ID")
+# ---------- 1. Токены из переменных HF ----------
+CLIENT_ID     = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-AUTH_BASIC = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
+BOT_TOKEN     = os.getenv("BOT_TOKEN")
+AUTH_BASIC    = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
-bot = Bot(BOT_TOKEN)
-dp = Dispatcher()
+# ---------- 2. Прокси Cloudflare Worker ----------
+WORKER_URL    = "https://wandering-darkness-fabb.worker45435345.workers.dev"
+bot = Bot(token=BOT_TOKEN, base_url=f"{WORKER_URL}/bot")
 
-# 1. Получаем access_token (30 мин)
+dp  = Dispatcher()
+
+# ---------- 3. Получаем access_token (30 мин) ----------
 async def get_token(session):
-    url = "https://gigachat.devices.sberbank.ru/api/v2/oauth"
+    url  = "https://gigachat.devices.sberbank.ru/api/v2/oauth"
     headers = {"Authorization": f"Basic {AUTH_BASIC}",
                "Content-Type": "application/x-www-form-urlencoded"}
     async with session.post(url, headers=headers, data="scope=GIGACHAT_API_PERS") as resp:
         return (await resp.json()).get("access_token")
 
-# 2. Kandinsky 3
+# ---------- 4. Kandinsky 3 ----------
 async def kandinsky(base64_img: str, token: str):
-    url = "https://gigachat.devices.sberbank.ru/api/v1/images/edit"
+    url  = "https://gigachat.devices.sberbank.ru/api/v1/images/edit"
     headers = {"Authorization": f"Bearer {token}",
                "Content-Type": "application/json"}
     payload = {"image": base64_img,
@@ -32,7 +35,7 @@ async def kandinsky(base64_img: str, token: str):
         async with s.post(url, headers=headers, json=payload) as r:
             return (await r.json()).get("image")
 
-# 3. Приём фото
+# ---------- 5. Приём фото ----------
 @dp.message(F.photo)
 async def get_photo(msg: types.Message):
     file = await bot.get_file(msg.photo[-1].file_id)
@@ -55,7 +58,7 @@ async def get_photo(msg: types.Message):
         else:
             await msg.answer("😞 Попробуйте ещё раз.")
 
-# 4. Кнопки + Stars
+# ---------- 6. Кнопки + Stars ----------
 def ikb_buy():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="10 шт – 199 ⭐", pay=True)]
@@ -69,6 +72,6 @@ async def pre_check(p: types.PreCheckoutQuery):
 async def paid(msg: types.Message):
     await msg.answer("Спасибо! ZIP с 10 шаблонами – заглушка)")
 
-# 5. Запуск
+# ---------- 7. Запуск ----------
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))
