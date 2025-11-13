@@ -14,10 +14,8 @@ CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 BOT_TOKEN     = os.getenv("BOT_TOKEN")
 AUTH_BASIC    = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
-# ========== ПРОКСИ RENDER ==========
-WORKER_URL    = "https://sneakercard-2.onrender.com"
-bot = Bot(token=BOT_TOKEN, base_url=f"{WORKER_URL}/bot")
-
+# ========== СОЗДАЁМ БОТА БЕЗ base_url ==========
+bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher()
 
 # ========== ПОЛУЧАЕМ ACCESS-TOKEN (30 мин) ==========
